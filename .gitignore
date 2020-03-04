@@ -1,0 +1,7 @@
+.idea/
+
+#files with input text
+files/
+
+#result of program
+index.txt
