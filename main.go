@@ -81,7 +81,7 @@ func main() {
 	}
 	// add delimiter
 	if _, err = f.WriteString("-\n"); err != nil {
-		log.Fatal("cannot write filenames to file:", err)
+		log.Fatal("cannot write delimiter to file:", err)
 	}
 	// save index
 	var res []byte
