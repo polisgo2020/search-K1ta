@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // Empty struct needs zero bytes
@@ -40,16 +42,25 @@ func main() {
 	}
 	// allocate map for index
 	index := make(map[string]Set)
+	// allocate array for filenames
+	filenames := make([]string, len(files))
 	// read all files
 	for i, fileInfo := range files {
-		filename := args[1] + "/" + fileInfo.Name()
+		filename := filepath.Join(args[1], fileInfo.Name())
 		// read bytes from file
 		bytes, err := ioutil.ReadFile(filename)
 		if err != nil {
 			log.Printf("Error on reading '%s': %s\n", filename, err)
 		}
+		// add file to names
+		filenames[i] = fileInfo.Name()
 		// add all words to index
 		for _, word := range strings.Fields(string(bytes)) {
+			word = strings.TrimFunc(word, func(r rune) bool {
+				return !unicode.IsDigit(r) && !unicode.IsLetter(r)
+			})
+			word = strings.ToLower(word)
+			// add word to
 			if set, ok := index[word]; ok {
 				set.Put(i)
 			} else {
@@ -57,11 +68,22 @@ func main() {
 			}
 		}
 	}
-	// save index to file
+	// open file for index
 	f, err := os.Create("index.txt")
 	if err != nil {
 		log.Fatal("cannot open file for index:", err)
 	}
+	// first save filenames
+	for i, v := range filenames {
+		if _, err = f.Write([]byte(fmt.Sprintf("%d:%s\n", i, v))); err != nil {
+			log.Fatal("cannot write filenames to file:", err)
+		}
+	}
+	// add delimiter
+	if _, err = f.WriteString("-\n"); err != nil {
+		log.Fatal("cannot write filenames to file:", err)
+	}
+	// save index
 	var res []byte
 	for k, v := range index {
 		res = append(res, []byte(fmt.Sprintf("%s:%d\n", k, v.Keys()))...)
