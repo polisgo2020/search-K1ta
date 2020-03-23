@@ -12,6 +12,12 @@ func (s *Set) Put(val int) {
 	(*s)[val] = Void{}
 }
 
+func (s *Set) PutAll(values []int) {
+	for _, val := range values {
+		s.Put(val)
+	}
+}
+
 func (s *Set) Keys() []int {
 	keys := make([]int, 0, len(*s))
 	for key := range *s {
