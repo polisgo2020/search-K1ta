@@ -20,7 +20,7 @@ func getWordsForGenerator() ([]string, error) {
 }
 
 type generatorSettings struct {
-	// number of files3 to generate
+	// number of files to generate
 	fileNumber int
 
 	// number of words per each file
@@ -30,9 +30,9 @@ type generatorSettings struct {
 	maxDictWords int
 }
 
-// generateFiles creates dir with dirPath, then generates files3 in this dir with generator settings
+// generateFiles creates dir with dirPath, then generates files in this dir with generator settings
 func generateFiles(settings generatorSettings, dict []string, dirPath string) error {
-	// create dir for random files3
+	// create dir for random files
 	if err := createDir(dirPath); err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func generateFiles(settings generatorSettings, dict []string, dirPath string) er
 	if n == 0 || len(dict) < n {
 		n = len(dict)
 	}
-	// generate files3
+	// generate files
 	for i := 0; i < settings.fileNumber; i++ {
 		fileName := fmt.Sprintf("%s/test-file_%d.txt", dirPath, i)
 		f, err := os.Create(fileName)
@@ -94,23 +94,23 @@ func BenchmarkMain(b *testing.B) {
 		testDir := allTestsDir + "/test1"
 		err := generateFiles(generatorSettings{fileNumber: 100, wordsNumber: 200}, dict, testDir)
 		if err != nil {
-			b.Fatal("Error on generating files3:", err)
+			b.Fatal("Error on generating files:", err)
 		}
 		startTest(testDir, b)
 	})
-	b.Run("a lot of small files3", func(b *testing.B) {
+	b.Run("a lot of small files", func(b *testing.B) {
 		testDir := allTestsDir + "/test2"
 		err := generateFiles(generatorSettings{10000, 100, 50}, dict, testDir)
 		if err != nil {
-			b.Fatal("Error on generating files3:", err)
+			b.Fatal("Error on generating files:", err)
 		}
 		startTest(testDir, b)
 	})
-	b.Run("a couple of large files3", func(b *testing.B) {
+	b.Run("a couple of large files", func(b *testing.B) {
 		testDir := allTestsDir + "/test3"
 		err := generateFiles(generatorSettings{100, 10000, 1000}, dict, testDir)
 		if err != nil {
-			b.Fatal("Error on generating files3:", err)
+			b.Fatal("Error on generating files:", err)
 		}
 		startTest(testDir, b)
 	})
@@ -118,7 +118,7 @@ func BenchmarkMain(b *testing.B) {
 		testDir := allTestsDir + "/test4"
 		err := generateFiles(generatorSettings{50, 10000, 10}, dict, testDir)
 		if err != nil {
-			b.Fatal("Error on generating files3:", err)
+			b.Fatal("Error on generating files:", err)
 		}
 		startTest(testDir, b)
 	})
@@ -126,12 +126,12 @@ func BenchmarkMain(b *testing.B) {
 		testDir := allTestsDir + "/test4"
 		err := generateFiles(generatorSettings{fileNumber: 50, wordsNumber: 10000}, dict, testDir)
 		if err != nil {
-			b.Fatal("Error on generating files3:", err)
+			b.Fatal("Error on generating files:", err)
 		}
 		startTest(testDir, b)
 	})
 
-	// clear dir with all test files3
+	// clear dir with all test files
 	if err = os.RemoveAll(allTestsDir); err != nil {
 		b.Fatal("Error on clearing dir with all tests:", err)
 	}
