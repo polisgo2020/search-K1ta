@@ -27,7 +27,6 @@ func Build(texts []string, titles []string) (Index, error) {
 	if len(texts) != len(titles) {
 		return Index{}, errors.New("length of texts is not equal to length of titles")
 	}
-	// todo check if we can specify length
 	index := make(map[string]Set)
 	for i, text := range texts {
 		// add all words to index
@@ -50,8 +49,8 @@ func Build(texts []string, titles []string) (Index, error) {
 func (index *Index) Save(writer io.Writer) error {
 	res := make([]byte, 0)
 	// save matching of title to index
-	for i, title := range index.Titles {
-		res = append(res, []byte(fmt.Sprintf("%d:%s\n", i, title))...)
+	for _, title := range index.Titles {
+		res = append(res, []byte(fmt.Sprintf("%s\n", title))...)
 	}
 	// save delimiter
 	res = append(res, []byte("-\n")...)
@@ -69,7 +68,6 @@ func (index *Index) Save(writer io.Writer) error {
 }
 
 func Read(reader io.Reader) (Index, error) {
-	// todo check if read by lines is better
 	bytes, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return Index{}, fmt.Errorf("cannot read index: %s", err)
@@ -83,9 +81,7 @@ func Read(reader io.Reader) (Index, error) {
 	index := Index{Data: make(map[string]Set)}
 	// get titles declarations
 	for _, line := range strings.Split(strings.Trim(tokens[0], "\n"), "\n") {
-		lineInfo := strings.SplitN(line, ":", 2)
-		// todo remove title index from result file 'index.txt'
-		index.Titles = append(index.Titles, lineInfo[1])
+		index.Titles = append(index.Titles, line)
 	}
 	// get index itself
 	for _, line := range strings.Split(strings.Trim(tokens[1], "\n"), "\n") {
