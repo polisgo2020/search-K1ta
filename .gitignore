@@ -2,6 +2,10 @@
 
 #files with input text
 files/
+*/*.txt
 
 #result of program
 index.txt
+
+#binary file
+search-K1ta
