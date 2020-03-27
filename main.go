@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/polisgo2020/search-K1ta/revindex"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"polisgo/revindex"
 )
 
 func main() {
