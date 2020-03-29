@@ -96,3 +96,79 @@ func BenchmarkBuild_SimpleTest(b *testing.B) {
 	})
 	b.Run("lot texts, few different words", func(b *testing.B) { goTest(b, texts, titles) })
 }
+
+// Generates Index with this format:
+//title-with-number-1
+//...
+//<textsNumber>
+//-
+//w1:[0,1,...,<textsNumber>]
+//w2:[0,1,...,<textsNumber>]
+func generateIndex(textsNumber int, wordsNumber int) *Index {
+	titles := make([]string, textsNumber)
+	entries := make(map[string]Set)
+	for i := 0; i < textsNumber; i++ {
+		titles[i] = fmt.Sprintf("title-with-number-%d", i)
+	}
+	for i := 0; i < wordsNumber; i++ {
+		set := Set{}
+		for j := 0; j < textsNumber; j++ {
+			set.Put(j)
+		}
+		entries[fmt.Sprintf("w%d", i)] = set
+	}
+	return &Index{
+		Titles: titles,
+		Data:   entries,
+	}
+}
+
+func BenchmarkIndex_Find(b *testing.B) {
+	b.Run("lot texts, few words, 100-words phrase", func(b *testing.B) {
+		index := generateIndex(1000, 10000)
+		phrase := "w0"
+		for i := 1; i < 100; i++ {
+			phrase = phrase + " " + fmt.Sprintf("w%d", i)
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = index.Find(phrase)
+		}
+	})
+
+	b.Run("lot texts, few words, 500-words phrase", func(b *testing.B) {
+		index := generateIndex(1000, 10000)
+		phrase := "w0"
+		for i := 1; i < 500; i++ {
+			phrase = phrase + " " + fmt.Sprintf("w%d", i)
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = index.Find(phrase)
+		}
+	})
+
+	b.Run("few texts, lot words, 100-words phrase", func(b *testing.B) {
+		index := generateIndex(10000, 1000)
+		phrase := "w0"
+		for i := 1; i < 100; i++ {
+			phrase = phrase + " " + fmt.Sprintf("w%d", i)
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = index.Find(phrase)
+		}
+	})
+
+	b.Run("few texts, lot words, 500-words phrase", func(b *testing.B) {
+		index := generateIndex(10000, 1000)
+		phrase := "w0"
+		for i := 1; i < 500; i++ {
+			phrase = phrase + " " + fmt.Sprintf("w%d", i)
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = index.Find(phrase)
+		}
+	})
+}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -106,18 +107,30 @@ func Read(reader io.Reader) (Index, error) {
 
 func (index *Index) Find(phrase string) map[string]int {
 	entriesMap := make(map[string]int)
-	for _, word := range strings.Fields(phrase) {
-		word = unifyWord(word)
-		// get indexes of texts with this word
-		titleIndices, exist := index.Data[word]
-		if !exist {
-			continue
-		}
-		// for each text title add one entry
-		for titleIndex := range titleIndices {
-			title := index.Titles[titleIndex]
-			entriesMap[title]++
-		}
+	var wg sync.WaitGroup
+	var mux sync.Mutex
+
+	phraseWords := strings.Fields(phrase)
+	wg.Add(len(phraseWords))
+	for _, word := range phraseWords {
+		go func(word string) {
+			word = unifyWord(word)
+			// get indexes of texts with this word
+			titleIndices, exist := index.Data[word]
+			if !exist {
+				wg.Done()
+				return
+			}
+			// for each text titlesToIn add one entry
+			for titleIndex := range titleIndices {
+				title := index.Titles[titleIndex]
+				mux.Lock()
+				entriesMap[title]++
+				mux.Unlock()
+			}
+			wg.Done()
+		}(word)
 	}
+	wg.Wait()
 	return entriesMap
 }
