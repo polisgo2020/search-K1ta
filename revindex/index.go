@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -24,7 +25,8 @@ func unifyWord(word string) string {
 }
 
 func Build(texts []string, titles []string) (Index, error) {
-	if len(texts) != len(titles) {
+	// no goroutines
+	/*if len(texts) != len(titles) {
 		return Index{}, errors.New("length of texts is not equal to length of titles")
 	}
 	index := make(map[string]Set)
@@ -43,7 +45,104 @@ func Build(texts []string, titles []string) (Index, error) {
 	return Index{
 		Titles: titles,
 		Data:   index,
+	}, nil*/
+
+	// mutexes
+	/*if len(texts) != len(titles) {
+		return Index{}, errors.New("length of texts is not equal to length of titles")
+	}
+	index := make(map[string]Set)
+	var wg sync.WaitGroup
+	var mux sync.Mutex
+	wg.Add(len(texts))
+	for i, text := range texts {
+		// add all words to index
+		go func(i int, text string) {
+			words := strings.Fields(text)
+			for _, word := range words {
+				word = unifyWord(word)
+				// add word to
+				mux.Lock()
+				if set, ok := index[word]; ok {
+					set.Put(i)
+				} else {
+					index[word] = Set{i: Void{}}
+				}
+				mux.Unlock()
+			}
+			wg.Done()
+		}(i, text)
+	}
+	wg.Wait()
+	return Index{
+		Titles: titles,
+		Data:   index,
+	}, nil*/
+
+	// merging
+	if len(texts) != len(titles) {
+		return Index{}, errors.New("length of texts is not equal to length of titles")
+	}
+	var wg sync.WaitGroup
+	indices := make([]map[string]Set, len(texts))
+	wg.Add(len(texts))
+	for i, text := range texts {
+		indices[i] = make(map[string]Set)
+		// add all words to index
+		go func(i int, text string) {
+			words := strings.Fields(text)
+			for _, word := range words {
+				word = unifyWord(word)
+				// add word to
+				if set, ok := indices[i][word]; ok {
+					set.Put(i)
+				} else {
+					indices[i][word] = Set{i: Void{}}
+				}
+			}
+			wg.Done()
+		}(i, text)
+	}
+	wg.Wait()
+	index := mergeIndices(indices)
+	return Index{
+		Titles: titles,
+		Data:   index,
 	}, nil
+
+}
+
+func mergeIndices(indices []map[string]Set) map[string]Set {
+	switch len(indices) {
+	case 0:
+		return map[string]Set{}
+	case 1:
+		return indices[0]
+	}
+	// simple merging
+	/*for _, index := range indices[1:] {
+		for word, titleIndices := range index {
+			if keys, ok := indices[0][word]; ok {
+				keys.PutAll(titleIndices.Keys())
+			} else {
+				indices[0][word] = titleIndices
+			}
+		}
+	}*/
+	// straight merging
+	for _, index := range indices[1:] {
+		for word, titleIndices := range index {
+			if _, ok := indices[0][word]; ok {
+				//keys.PutAll(titleIndices.Keys())
+				for key := range titleIndices {
+					indices[0][word][key] = Void{}
+				}
+			} else {
+				indices[0][word] = titleIndices
+			}
+		}
+	}
+	return indices[0]
 }
 
 func (index *Index) Save(writer io.Writer) error {
@@ -56,7 +155,7 @@ func (index *Index) Save(writer io.Writer) error {
 	res = append(res, []byte("-\n")...)
 	// save index
 	for word, keySet := range index.Data {
-		keys := keySet.Keys()
+		keys := keySet.SortedKeys()
 		// marshal keys to json to simplify reading
 		marshaledKeys, _ := json.Marshal(keys)
 		res = append(res, []byte(fmt.Sprintf("%s:%s\n", word, marshaledKeys))...)

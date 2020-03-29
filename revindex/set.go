@@ -18,11 +18,19 @@ func (s *Set) PutAll(values []int) {
 	}
 }
 
-func (s *Set) Keys() []int {
+func (s *Set) SortedKeys() []int {
 	keys := make([]int, 0, len(*s))
 	for key := range *s {
 		keys = append(keys, key)
 	}
 	sort.Ints(keys)
+	return keys
+}
+
+func (s *Set) Keys() []int {
+	keys := make([]int, 0, len(*s))
+	for key := range *s {
+		keys = append(keys, key)
+	}
 	return keys
 }
