@@ -26,11 +26,3 @@ func (s *Set) SortedKeys() []int {
 	sort.Ints(keys)
 	return keys
 }
-
-func (s *Set) Keys() []int {
-	keys := make([]int, 0, len(*s))
-	for key := range *s {
-		keys = append(keys, key)
-	}
-	return keys
-}
