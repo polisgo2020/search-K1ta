@@ -5,7 +5,10 @@ files/
 */*.txt
 
 #result of program
-index.txt
+*.txt
+
+#benchmark results
+benchmarks*.md
 
 #binary file
 search-K1ta
