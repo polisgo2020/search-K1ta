@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 func main() {
@@ -20,12 +21,11 @@ func main() {
 		if len(args) < 3 {
 			log.Fatal("Specify path to folder with texts")
 		}
-		files, err := ioutil.ReadDir(args[2])
-		if err != nil {
-			log.Fatal(fmt.Sprintf("Error while reading dir '%s': %s", args[1], err))
-		}
 		// get texts and titles
-		texts, titles := getTextsAndTitlesFromFiles(args[2], files)
+		texts, titles, err := getTextsAndTitlesFromDir(args[2])
+		if err != nil {
+			log.Fatal("Error:", err)
+		}
 		// build index
 		index, err := revindex.Build(texts, titles)
 		if err != nil {
@@ -77,18 +77,31 @@ func main() {
 
 }
 
-func getTextsAndTitlesFromFiles(path string, files []os.FileInfo) ([]string, []string) {
+func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
+	files, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error while reading dir '%s': %s", dirPath, err)
+	}
 	texts := make([]string, 0, len(files))
 	titles := make([]string, 0, len(files))
+	var mux sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(files))
 	for _, fileInfo := range files {
-		filename := filepath.Join(path, fileInfo.Name())
-		// read bytes from file
-		bytes, err := ioutil.ReadFile(filename)
-		if err != nil {
-			log.Printf("Error on reading '%s': %s\n", filename, err)
-		}
-		texts = append(texts, string(bytes))
-		titles = append(titles, fileInfo.Name())
+		go func(fileInfo os.FileInfo) {
+			filename := filepath.Join(dirPath, fileInfo.Name())
+			// read bytes from file
+			bytes, err := ioutil.ReadFile(filename)
+			if err != nil {
+				log.Printf("Error on reading '%s': %s\n", filename, err)
+			}
+			mux.Lock()
+			texts = append(texts, string(bytes))
+			titles = append(titles, fileInfo.Name())
+			mux.Unlock()
+			wg.Done()
+		}(fileInfo)
 	}
-	return texts, titles
+	wg.Wait()
+	return texts, titles, nil
 }

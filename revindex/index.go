@@ -56,7 +56,7 @@ func (index *Index) Save(writer io.Writer) error {
 	res = append(res, []byte("-\n")...)
 	// save index
 	for word, keySet := range index.Data {
-		keys := keySet.Keys()
+		keys := keySet.SortedKeys()
 		// marshal keys to json to simplify reading
 		marshaledKeys, _ := json.Marshal(keys)
 		res = append(res, []byte(fmt.Sprintf("%s:%s\n", word, marshaledKeys))...)
@@ -113,7 +113,7 @@ func (index *Index) Find(phrase string) map[string]int {
 		if !exist {
 			continue
 		}
-		// for each text title add one entry
+		// for each text titlesToIn add one entry
 		for titleIndex := range titleIndices {
 			title := index.Titles[titleIndex]
 			entriesMap[title]++
