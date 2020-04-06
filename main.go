@@ -10,73 +10,75 @@ import (
 	"sync"
 )
 
+// logger for console
+var console = log.New(os.Stdout, "", 0)
+
 func main() {
+	// get args
 	args := os.Args
-	if len(args) < 2 {
-		log.Fatal("Not enough arguments. Run ", args[0], " help")
+	// create func for length validation
+	exitIfNotEnoughArgs := func(length int) {
+		if len(args) < length {
+			console.Fatal("Not enough arguments. Run ", args[0], " help")
+		}
 	}
+
 	switch args[1] {
 	case "build":
-		// get files in dir
-		if len(args) < 3 {
-			log.Fatal("Specify path to folder with texts")
-		}
-		// get texts and titles
-		texts, titles, err := getTextsAndTitlesFromDir(args[2])
-		if err != nil {
-			log.Fatal("Error:", err)
-		}
-		// build index
-		index, err := revindex.Build(texts, titles)
-		if err != nil {
-			log.Fatal("Error on building index:", err)
-		}
-		// open file for index
-		f, err := os.Create("index.txt")
-		if err != nil {
-			log.Fatal("cannot open file for index:", err)
-		}
-		// save index
-		err = index.Save(f)
-		if err != nil {
-			log.Fatal("Error on writing index to file:", err)
-		}
-		// close file
-		if err = f.Close(); err != nil {
-			log.Fatal("cannot close file with index:", err)
-		}
+		exitIfNotEnoughArgs(3)
+		build(args[2])
 	case "find":
-		if len(args) < 4 {
-			log.Fatal("Not enough arguments")
-		}
-		f, err := os.Open(args[2])
-		if err != nil {
-			log.Fatalf("Cannot open file '%s': %s\n", args[2], err)
-		}
-		// read index
-		index, err := revindex.Read(f)
-		if err != nil {
-			log.Fatalf("Cannot read index from file '%s': %s\n", args[2], err)
-		}
-		// find words from phrase
-		res := index.Find(args[3])
-		if len(res) == 0 {
-			log.Println("No entries")
-			return
-		}
-		log.Println("Entries:")
-		for title, amount := range res {
-			fmt.Printf("%s; entries: %d\n", title, amount)
-		}
+		exitIfNotEnoughArgs(4)
+		find(args[2], args[3])
+	case "start":
+		exitIfNotEnoughArgs(4)
+		start(args[2], args[3])
 	case "help":
-		log.Println("Tool for creating index by texts and find phrases in it")
-		log.Println("Usage:")
-		log.Println(args[0], "build <dir>			builds index by files in dir")
-		log.Println(args[0], "find <index> \"<prhase>\"		find phrase in specified index")
+		console.Println("Tool for creating index by texts and find phrases in it")
+		console.Println("Usage:")
+		console.Println(args[0], "build <dir>")
+		console.Println("\tbuild index by files in dir")
+		console.Println()
+		console.Println(args[0], "find <index> \"<phrase>\"")
+		console.Println("\tfind phrase in specified index")
+		console.Println()
+		console.Println(args[0], "start <index> <port>")
+		console.Println("\tstart server for searching phrases in the specified index on port. console.Fatal by pressing 'q'")
+		console.Println("\tServer API:")
+		console.Println("\tGET /find?phrase=<phrase> - find phrase in index. Response is json from find function")
+		console.Println("\tGET / - returns main page")
 	}
-
 }
 
+// Build index from files in dir and save it to file "index.txt"
+func build(dir string) {
+	// get texts and titles
+	texts, titles, err := getTextsAndTitlesFromDir(dir)
+	if err != nil {
+		console.Fatal("Error:", err)
+	}
+	// build index
+	index, err := revindex.Build(texts, titles)
+	if err != nil {
+		console.Fatal("Error on building index:", err)
+	}
+	// open file for index
+	f, err := os.Create("index.txt")
+	if err != nil {
+		console.Fatal("cannot open file for index:", err)
+	}
+	// save index
+	err = index.Save(f)
+	if err != nil {
+		console.Fatal("Error on writing index to file:", err)
+	}
+	// close file
+	if err = f.Close(); err != nil {
+		console.Fatal("cannot close file with index:", err)
+	}
+}
+
+// Get texts and titles from dir
 func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -93,7 +95,7 @@ func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 			// read bytes from file
 			bytes, err := ioutil.ReadFile(filename)
 			if err != nil {
-				log.Printf("Error on reading '%s': %s\n", filename, err)
+				console.Printf("Error on reading '%s': %s\n", filename, err)
 			}
 			mux.Lock()
 			texts = append(texts, string(bytes))
@@ -104,4 +106,27 @@ func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 	}
 	wg.Wait()
 	return texts, titles, nil
+}
+
+// Find phrase in index
+func find(indexPath string, phrase string) {
+	// read index
+	f, err := os.Open(indexPath)
+	if err != nil {
+		console.Fatalf("Cannot open file '%s': %s\n", indexPath, err)
+	}
+	index, err := revindex.Read(f)
+	if err != nil {
+		console.Fatalf("Cannot read index from file '%s': %s\n", indexPath, err)
+	}
+	// find words from phrase
+	res := index.Find(phrase)
+	if len(res) == 0 {
+		console.Println("No entries")
+		return
+	}
+	console.Println("Entries:")
+	for title, amount := range res {
+		console.Printf("%s; entries: %d\n", title, amount)
+	}
 }

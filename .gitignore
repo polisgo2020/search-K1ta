@@ -7,8 +7,5 @@ files/
 #result of program
 *.txt
 
-#benchmark results
-benchmarks*.md
-
 #binary file
 search-K1ta
