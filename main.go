@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/polisgo2020/search-K1ta/revindex"
+	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,70 +15,65 @@ import (
 var console = log.New(os.Stdout, "", 0)
 
 func main() {
-	// get args
-	args := os.Args
-	// create func for length validation
-	exitIfNotEnoughArgs := func(length int) {
-		if len(args) < length {
-			console.Fatal("Not enough arguments. Run ", args[0], " help")
-		}
+	app := &cli.App{
+		Usage: "Tool for creating an index on texts and searching phrases in it",
+		Commands: []*cli.Command{
+			{
+				Name:      "build",
+				Aliases:   []string{"b"},
+				Usage:     "Build index by files in dir",
+				ArgsUsage: "<dir>",
+				Action: func(ctx *cli.Context) error {
+					dir := ctx.Args().Get(0)
+					if dir == "" {
+						console.Fatal("Specify dir with files")
+					}
+					build(dir)
+					return nil
+				},
+			},
+			{
+				Name:      "find",
+				Aliases:   []string{"f"},
+				Usage:     "Find phrase in specified index",
+				ArgsUsage: "<index_file> \"<phrase>\"",
+				Action: func(ctx *cli.Context) error {
+					index := ctx.Args().Get(0)
+					if index == "" {
+						console.Fatal("specify index file")
+					}
+					phrase := ctx.Args().Get(1)
+					find(index, phrase)
+					return nil
+				},
+			},
+			{
+				Name:    "start",
+				Aliases: []string{"s"},
+				Usage:   "Start server for searching phrases in the specified index on port",
+				Description: "Server API:\n" +
+					"GET /find?phrase=<phrase> - find phrase in index. Response is json from find function\n" +
+					"GET / - returns main page",
+				ArgsUsage: "<index_file> \"<port>\"",
+				Action: func(ctx *cli.Context) error {
+					index := ctx.Args().Get(0)
+					if index == "" {
+						console.Fatal("specify index file")
+					}
+					port := ctx.Args().Get(1)
+					if port == "" {
+						console.Fatal("specify server port")
+					}
+					find(index, port)
+					return nil
+				},
+			},
+		},
+		HideVersion: true,
 	}
-
-	// exit if we don't have command
-	exitIfNotEnoughArgs(2)
-
-	switch args[1] {
-	case "build":
-		exitIfNotEnoughArgs(3)
-		build(args[2])
-	case "find":
-		exitIfNotEnoughArgs(4)
-		find(args[2], args[3])
-	case "start":
-		exitIfNotEnoughArgs(4)
-		start(args[2], args[3])
-	case "help":
-		console.Println("Tool for creating index by texts and find phrases in it")
-		console.Println("Usage:")
-		console.Println(args[0], "build <dir>")
-		console.Println("\tbuild index by files in dir")
-		console.Println()
-		console.Println(args[0], "find <index> \"<phrase>\"")
-		console.Println("\tfind phrase in specified index")
-		console.Println()
-		console.Println(args[0], "start <index> <port>")
-		console.Println("\tstart server for searching phrases in the specified index on port. console.Fatal by pressing 'q'")
-		console.Println("\tServer API:")
-		console.Println("\tGET /find?phrase=<phrase> - find phrase in index. Response is json from find function")
-		console.Println("\tGET / - returns main page")
-	}
-}
-
-// Build index from files in dir and save it to file "index.txt"
-func build(dir string) {
-	// get texts and titles
-	texts, titles, err := getTextsAndTitlesFromDir(dir)
+	err := app.Run(os.Args)
 	if err != nil {
-		console.Fatal("Error:", err)
-	}
-	// build index
-	index, err := revindex.Build(texts, titles)
-	if err != nil {
-		console.Fatal("Error on building index:", err)
-	}
-	// open file for index
-	f, err := os.Create("index.txt")
-	if err != nil {
-		console.Fatal("cannot open file for index:", err)
-	}
-	// save index
-	err = index.Save(f)
-	if err != nil {
-		console.Fatal("Error on writing index to file:", err)
-	}
-	// close file
-	if err = f.Close(); err != nil {
-		console.Fatal("cannot close file with index:", err)
+		console.Fatal(err)
 	}
 }
 
@@ -109,6 +105,34 @@ func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 	}
 	wg.Wait()
 	return texts, titles, nil
+}
+
+// Build index from files in dir and save it to file "index.txt"
+func build(dir string) {
+	// get texts and titles
+	texts, titles, err := getTextsAndTitlesFromDir(dir)
+	if err != nil {
+		console.Fatal("Error:", err)
+	}
+	// build index
+	index, err := revindex.Build(texts, titles)
+	if err != nil {
+		console.Fatal("Error on building index:", err)
+	}
+	// open file for index
+	f, err := os.Create("index.txt")
+	if err != nil {
+		console.Fatal("cannot open file for index:", err)
+	}
+	// save index
+	err = index.Save(f)
+	if err != nil {
+		console.Fatal("Error on writing index to file:", err)
+	}
+	// close file
+	if err = f.Close(); err != nil {
+		console.Fatal("cannot close file with index:", err)
+	}
 }
 
 // Find phrase in index
