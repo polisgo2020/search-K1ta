@@ -23,6 +23,9 @@ func main() {
 		}
 	}
 
+	// exit if we don't have command
+	exitIfNotEnoughArgs(2)
+
 	switch args[1] {
 	case "build":
 		exitIfNotEnoughArgs(3)
