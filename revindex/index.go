@@ -88,7 +88,7 @@ func Read(reader io.Reader) (Index, error) {
 		// get word and indices of texts with it
 		lineInfo := strings.Split(line, ":")
 		if len(lineInfo) != 2 {
-			return Index{}, fmt.Errorf("invalid format of words map in index")
+			return Index{}, fmt.Errorf("invalid format of words map in index. Line: %s", line)
 		}
 		// unmarshal indices
 		var titleIndices []int
