@@ -54,7 +54,7 @@ func main() {
 				Description: "Server API:\n" +
 					"GET /find?phrase=<phrase> - find phrase in index. Response is json from find function\n" +
 					"GET / - returns main page",
-				ArgsUsage: "<index_file> \"<port>\"",
+				ArgsUsage: "<index_file> <port>",
 				Action: func(ctx *cli.Context) error {
 					index := ctx.Args().Get(0)
 					if index == "" {
@@ -64,7 +64,7 @@ func main() {
 					if port == "" {
 						console.Fatal("specify server port")
 					}
-					find(index, port)
+					start(index, port)
 					return nil
 				},
 			},
