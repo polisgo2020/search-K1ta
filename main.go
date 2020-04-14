@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/polisgo2020/search-K1ta/revindex"
+	"github.com/polisgo2020/search-K1ta/server"
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"log"
@@ -48,24 +49,26 @@ func main() {
 				},
 			},
 			{
-				Name:    "start",
-				Aliases: []string{"s"},
-				Usage:   "Start server for searching phrases in the specified index on port",
-				Description: "Server API:\n" +
-					"GET /find?phrase=<phrase> - find phrase in index. Response is json from find function\n" +
-					"GET / - returns main page",
-				ArgsUsage: "<index_file> \"<port>\"",
+				Name:        "start",
+				Aliases:     []string{"s"},
+				Usage:       "Start server for searching phrases in the specified index. Main page is on /",
+				Description: "Env variable for server addr: POLISGO_ADDR=ADDR. Default is localhost:8080",
+				ArgsUsage:   "<index_file>",
 				Action: func(ctx *cli.Context) error {
-					index := ctx.Args().Get(0)
-					if index == "" {
-						console.Fatal("specify index file")
+					indexPath := ctx.Args().Get(0)
+					if indexPath == "" {
+						console.Fatal("specify indexPath file")
 					}
-					port := ctx.Args().Get(1)
-					if port == "" {
-						console.Fatal("specify server port")
+					// read index
+					f, err := os.Open(indexPath)
+					if err != nil {
+						console.Fatalf("Cannot open file '%s': %s\n", indexPath, err)
 					}
-					find(index, port)
-					return nil
+					index, err := revindex.Read(f)
+					if err != nil {
+						console.Fatalf("Cannot read index from file '%s': %s\n", indexPath, err)
+					}
+					return server.Start(index)
 				},
 			},
 		},
