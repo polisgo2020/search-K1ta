@@ -1,6 +1,7 @@
 package revindex
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -289,4 +290,75 @@ func TestUnifyWord(t *testing.T) {
 	if w != "1ggфф" {
 		t.Fatal("Unified word is invalid")
 	}
+}
+
+func TestIndex_Save(t *testing.T) {
+	index := Index{
+		Titles: []string{"1", "2"},
+		Data: map[string]Set{
+			"a": *SetFrom([]int{0}),
+			"b": *SetFrom([]int{0, 1}),
+			"c": *SetFrom([]int{1}),
+		},
+	}
+	writer := bytes.NewBufferString("")
+	if err := index.Save(writer); err != nil {
+		t.Fatal("Cannot save index:", err)
+	}
+	exp := "1\n2\n-\na:[0]\nb:[0,1]\nc:[1]\n"
+	act := writer.String()
+	t.Log("exp:", exp)
+	t.Log("act:", act)
+	if exp != act {
+		t.Fatal("Wrong result")
+	}
+}
+
+func TestRead(t *testing.T) {
+	saveAndRead := func(index Index) Index {
+		writer := bytes.NewBufferString("")
+		if err := index.Save(writer); err != nil {
+			t.Fatal("Cannot save index:", err)
+		}
+		t.Log("saved string:", writer.String())
+		reader := strings.NewReader(writer.String())
+		res, err := Read(reader)
+		if err != nil {
+			t.Fatal("Read failed:", err)
+		}
+		return res
+	}
+	t.Run("simple test", func(t *testing.T) {
+		exp := Index{
+			Titles: []string{"1", "2"},
+			Data: map[string]Set{
+				"a": *SetFrom([]int{0}),
+				"b": *SetFrom([]int{0, 1}),
+				"c": *SetFrom([]int{1}),
+			},
+		}
+		act := saveAndRead(exp)
+		t.Log("act:", act)
+		t.Log("exp:", exp)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("title with colon", func(t *testing.T) {
+		exp := Index{
+			Titles: []string{"1:2:3:", "2"},
+			Data: map[string]Set{
+				"a": *SetFrom([]int{0}),
+				"b": *SetFrom([]int{0, 1}),
+				"c": *SetFrom([]int{1}),
+			},
+		}
+		act := saveAndRead(exp)
+		t.Log("act:", act)
+		t.Log("exp:", exp)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
 }
