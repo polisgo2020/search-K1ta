@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="../static/styles/index.css">
+</head>
+<body>
+<div class="title">
+    Find your phrase in index:
+</div>
+<form class="search" method="get" action="/search?phrase">
+    <input class="search-input" type="text" name="phrase" placeholder="Type your phrase.."
+    ><input class="search-find" type="submit" value="Find">
+</form>
+<div class="result">
+    {{ if not . }}
+        <div class="result-line">
+            No results
+        </div>
+    {{ end }}
+    {{ range $title, $entries := . }}
+        <div class="result-line">
+            <div class="result-title">{{ $title }}</div>
+            <div class="result-entries">{{ $entries }}</div>
+        </div>
+    {{ end }}
+</div>
+</body>
+</html>
