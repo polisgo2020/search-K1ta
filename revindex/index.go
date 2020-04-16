@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -54,12 +55,20 @@ func (index *Index) Save(writer io.Writer) error {
 	}
 	// save delimiter
 	res = append(res, []byte("-\n")...)
-	// save index
-	for word, keySet := range index.Data {
-		keys := keySet.SortedKeys()
+	// save sorted index
+	// sort keys first
+	keys := make([]string, 0, len(index.Data))
+	for k := range index.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	// iterate with sorted keys
+	for _, word := range keys {
+		indices := index.Data[word]
+		sortedIndices := indices.SortedKeys()
 		// marshal keys to json to simplify reading
-		marshaledKeys, _ := json.Marshal(keys)
-		res = append(res, []byte(fmt.Sprintf("%s:%s\n", word, marshaledKeys))...)
+		marshaledIndices, _ := json.Marshal(sortedIndices)
+		res = append(res, []byte(fmt.Sprintf("%s:%s\n", word, marshaledIndices))...)
 	}
 	if _, err := writer.Write(res); err != nil {
 		return fmt.Errorf("cannot write index: %s", err)
@@ -86,20 +95,22 @@ func Read(reader io.Reader) (Index, error) {
 	// get index itself
 	for _, line := range strings.Split(strings.Trim(tokens[1], "\n"), "\n") {
 		// get word and indices of texts with it
-		lineInfo := strings.Split(line, ":")
-		if len(lineInfo) != 2 {
-			return Index{}, fmt.Errorf("invalid format of words map in index")
+		lastColon := strings.LastIndex(line, ":")
+		if lastColon == -1 || lastColon == len(line)-1 {
+			return Index{}, fmt.Errorf("invalid format of words map in index. Line: %s", line)
 		}
+		title := line[:lastColon]
+		indices := line[lastColon+1:]
 		// unmarshal indices
 		var titleIndices []int
-		err = json.Unmarshal([]byte(lineInfo[1]), &titleIndices)
+		err = json.Unmarshal([]byte(indices), &titleIndices)
 		if err != nil {
 			return Index{}, fmt.Errorf("cannot unmarshal list with indices: %s", err)
 		}
 		// put indices to set
 		set := Set{}
 		set.PutAll(titleIndices)
-		index.Data[lineInfo[0]] = set
+		index.Data[title] = set
 	}
 	return index, nil
 }

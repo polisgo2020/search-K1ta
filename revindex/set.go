@@ -26,3 +26,11 @@ func (s *Set) SortedKeys() []int {
 	sort.Ints(keys)
 	return keys
 }
+
+func SetFrom(values []int) *Set {
+	set := Set{}
+	for _, v := range values {
+		set.Put(v)
+	}
+	return &set
+}

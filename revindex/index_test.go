@@ -1,9 +1,11 @@
 package revindex
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -169,6 +171,194 @@ func BenchmarkIndex_Find(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = index.Find(phrase)
+		}
+	})
+}
+
+func TestBuild(t *testing.T) {
+	t.Run("simple test", func(t *testing.T) {
+		titles := []string{"1", "2"}
+		texts := []string{"a; \"b,\".", "B! c..."}
+		act, err := Build(texts, titles)
+		if err != nil {
+			t.Fatal("Failed to build act:", err)
+		}
+		t.Log("Index.Titles:", act.Titles)
+		t.Log("Index.Data:", act.Data)
+		if !reflect.DeepEqual(act.Titles, titles) {
+			t.Fatal("Titles are not equals")
+		}
+		exp := map[string]Set{
+			"a": *SetFrom([]int{0}),
+			"b": *SetFrom([]int{0, 1}),
+			"c": *SetFrom([]int{1}),
+		}
+		t.Log("Expected:", exp)
+		if !reflect.DeepEqual(act.Data, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("two titles, one text", func(t *testing.T) {
+		titles := []string{"1", "2"}
+		texts := []string{"single text"}
+		_, err := Build(texts, titles)
+		if err == nil {
+			t.Fatal("Build must return an error")
+		}
+		t.Log("Returned error:", err)
+	})
+}
+
+func TestIndex_Find(t *testing.T) {
+	// index:
+	// 0: a b
+	// 1: b c
+	index := Index{
+		Titles: []string{"0", "1"},
+		Data: map[string]Set{
+			"a": *SetFrom([]int{0}),
+			"b": *SetFrom([]int{0, 1}),
+			"c": *SetFrom([]int{1}),
+		},
+	}
+
+	t.Run("two words", func(t *testing.T) {
+		act := index.Find("a b")
+		exp := map[string]int{
+			"0": 2,
+			"1": 1,
+		}
+		t.Log("exp=", exp)
+		t.Log("act=", act)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("two identical words", func(t *testing.T) {
+		act := index.Find("a a")
+		exp := map[string]int{
+			"0": 2,
+		}
+		t.Log("exp=", exp)
+		t.Log("act=", act)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("all words duplicated", func(t *testing.T) {
+		act := index.Find("A: a. B, b.\n C! c?")
+		exp := map[string]int{
+			"0": 4,
+			"1": 4,
+		}
+		t.Log("exp=", exp)
+		t.Log("act=", act)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("one word from index, one odd word", func(t *testing.T) {
+		act := index.Find("a d")
+		exp := map[string]int{
+			"0": 1,
+		}
+		t.Log("exp=", exp)
+		t.Log("act=", act)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("words not from index", func(t *testing.T) {
+		act := index.Find("d e")
+		t.Log("exp=", []int{})
+		t.Log("act=", act)
+		if len(act) != 0 {
+			t.Fatal("Wrong result")
+		}
+	})
+}
+
+func TestUnifyWord(t *testing.T) {
+	word := "1GgФф.,:!?\"'[]{}()`-_+=*/#$"
+	w := unifyWord(word)
+	t.Log("Unified word:", w)
+	if w != "1ggфф" {
+		t.Fatal("Unified word is invalid")
+	}
+}
+
+func TestIndex_Save(t *testing.T) {
+	index := Index{
+		Titles: []string{"1", "2"},
+		Data: map[string]Set{
+			"a": *SetFrom([]int{0}),
+			"b": *SetFrom([]int{0, 1}),
+			"c": *SetFrom([]int{1}),
+		},
+	}
+	writer := bytes.NewBufferString("")
+	if err := index.Save(writer); err != nil {
+		t.Fatal("Cannot save index:", err)
+	}
+	exp := "1\n2\n-\na:[0]\nb:[0,1]\nc:[1]\n"
+	act := writer.String()
+	t.Log("exp:", exp)
+	t.Log("act:", act)
+	if exp != act {
+		t.Fatal("Wrong result")
+	}
+}
+
+func TestRead(t *testing.T) {
+	saveAndRead := func(index Index) Index {
+		writer := bytes.NewBufferString("")
+		if err := index.Save(writer); err != nil {
+			t.Fatal("Cannot save index:", err)
+		}
+		t.Log("saved string:", writer.String())
+		reader := strings.NewReader(writer.String())
+		res, err := Read(reader)
+		if err != nil {
+			t.Fatal("Read failed:", err)
+		}
+		return res
+	}
+	t.Run("simple test", func(t *testing.T) {
+		exp := Index{
+			Titles: []string{"1", "2"},
+			Data: map[string]Set{
+				"a": *SetFrom([]int{0}),
+				"b": *SetFrom([]int{0, 1}),
+				"c": *SetFrom([]int{1}),
+			},
+		}
+		act := saveAndRead(exp)
+		t.Log("act:", act)
+		t.Log("exp:", exp)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
+		}
+	})
+
+	t.Run("title with colon", func(t *testing.T) {
+		exp := Index{
+			Titles: []string{"1:2:3:", "2"},
+			Data: map[string]Set{
+				"a": *SetFrom([]int{0}),
+				"b": *SetFrom([]int{0, 1}),
+				"c": *SetFrom([]int{1}),
+			},
+		}
+		act := saveAndRead(exp)
+		t.Log("act:", act)
+		t.Log("exp:", exp)
+		if !reflect.DeepEqual(act, exp) {
+			t.Fatal("Wrong result")
 		}
 	})
 }
