@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/caarlos0/env/v6"
+	_ "github.com/lib/pq"
+	"github.com/polisgo2020/search-K1ta/database"
 	"github.com/polisgo2020/search-K1ta/revindex"
 	"github.com/polisgo2020/search-K1ta/server"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"log"
@@ -12,24 +16,47 @@ import (
 	"sync"
 )
 
+// app config
+type Config struct {
+	Addr         string `env:"POLISGO_ADDR" envDefault:"localhost:8080"`
+	Hostname     string `env:"DB_HOSTNAME" envDefault:"localhost"`
+	Hostport     string `env:"DB_HOSTPORT" envDefault:"5432"`
+	Username     string `env:"DB_USERNAME" envDefault:"postgres"`
+	Password     string `env:"DB_PASSWORD" envDefault:"postgres"`
+	DatabaseName string `env:"DB_NAME" envDefault:"postgres"`
+}
+
 // logger for console
 var console = log.New(os.Stdout, "", 0)
+var cfg Config
 
 func main() {
+	if err := env.Parse(&cfg); err != nil {
+		logrus.Fatal("Error on parsing config:", err)
+	}
 	app := &cli.App{
 		Usage: "Tool for creating an index on texts and searching phrases in it",
 		Commands: []*cli.Command{
 			{
-				Name:      "build",
-				Aliases:   []string{"b"},
-				Usage:     "Build index by files in dir",
+				Name:    "build",
+				Aliases: []string{"b"},
+				Usage:   "Build index by files in dir",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "clear",
+						Aliases: []string{"c"},
+						Usage:   "clear database before saving index",
+						Value:   false,
+					},
+				},
 				ArgsUsage: "<dir>",
 				Action: func(ctx *cli.Context) error {
 					dir := ctx.Args().Get(0)
 					if dir == "" {
 						console.Fatal("Specify dir with files")
 					}
-					build(dir)
+					clearDb := ctx.Bool("clear")
+					build(dir, clearDb)
 					return nil
 				},
 			},
@@ -37,38 +64,31 @@ func main() {
 				Name:      "find",
 				Aliases:   []string{"f"},
 				Usage:     "Find phrase in specified index",
-				ArgsUsage: "<index_file> \"<phrase>\"",
+				ArgsUsage: "\"<phrase>\"",
 				Action: func(ctx *cli.Context) error {
-					index := ctx.Args().Get(0)
-					if index == "" {
-						console.Fatal("specify index file")
-					}
-					phrase := ctx.Args().Get(1)
-					find(index, phrase)
+					phrase := ctx.Args().Get(0)
+					findInDb(phrase)
 					return nil
 				},
 			},
 			{
 				Name:        "start",
 				Aliases:     []string{"s"},
-				Usage:       "Start server for searching phrases in the specified index. Main page is on /",
+				Usage:       "Start server for searching phrases. Main page is on /",
 				Description: "Env variable for server addr: POLISGO_ADDR=ADDR. Default is localhost:8080",
-				ArgsUsage:   "<index_file>",
 				Action: func(ctx *cli.Context) error {
-					indexPath := ctx.Args().Get(0)
-					if indexPath == "" {
-						console.Fatal("specify indexPath file")
-					}
-					// read index
-					f, err := os.Open(indexPath)
+					// connect to db
+					db, err := database.Connect(cfg.Hostname, cfg.Hostport, cfg.Username, cfg.Password, cfg.DatabaseName)
 					if err != nil {
-						console.Fatalf("Cannot open file '%s': %s\n", indexPath, err)
+						logrus.Fatal("Error on connecting to database:", err)
 					}
-					index, err := revindex.Read(f)
-					if err != nil {
-						console.Fatalf("Cannot read index from file '%s': %s\n", indexPath, err)
-					}
-					return server.Start(index)
+					defer func() {
+						err = db.Close()
+						if err != nil {
+							logrus.Fatal("Error on closing connection to database:", err)
+						}
+					}()
+					return server.Start(cfg.Addr, db)
 				},
 			},
 		},
@@ -111,7 +131,7 @@ func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 }
 
 // Build index from files in dir and save it to file "index.txt"
-func build(dir string) {
+func build(dir string, clearDb bool) {
 	// get texts and titles
 	texts, titles, err := getTextsAndTitlesFromDir(dir)
 	if err != nil {
@@ -122,35 +142,50 @@ func build(dir string) {
 	if err != nil {
 		console.Fatal("Error on building index:", err)
 	}
-	// open file for index
-	f, err := os.Create("index.txt")
+	// save to db
+	db, err := database.Connect(cfg.Hostname, cfg.Hostport, cfg.Username, cfg.Password, cfg.DatabaseName)
 	if err != nil {
-		console.Fatal("cannot open file for index:", err)
+		console.Fatal("Error on connecting to database:", err)
 	}
-	// save index
-	err = index.Save(f)
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			console.Fatal("Error on closing connection to database:", err)
+		}
+	}()
+	// clear db if we need
+	if clearDb {
+		console.Println("Clearing database")
+		err = db.DropAll()
+		if err != nil {
+			console.Fatal("Error on clearing db:", err)
+		}
+	}
+	err = db.Init()
 	if err != nil {
-		console.Fatal("Error on writing index to file:", err)
+		console.Fatal("Error on init db:", err)
 	}
-	// close file
-	if err = f.Close(); err != nil {
-		console.Fatal("cannot close file with index:", err)
+	err = index.SaveToDb(db)
+	if err != nil {
+		console.Fatal("Error on saving index to db:", err)
 	}
 }
 
-// Find phrase in index
-func find(indexPath string, phrase string) {
-	// read index
-	f, err := os.Open(indexPath)
+func findInDb(phrase string) {
+	db, err := database.Connect(cfg.Hostname, cfg.Hostport, cfg.Username, cfg.Password, cfg.DatabaseName)
 	if err != nil {
-		console.Fatalf("Cannot open file '%s': %s\n", indexPath, err)
+		console.Fatal("Error on connecting to database:", err)
 	}
-	index, err := revindex.Read(f)
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			console.Fatal("Error on closing connection to database:", err)
+		}
+	}()
+	res, err := revindex.FindInDb(phrase, db)
 	if err != nil {
-		console.Fatalf("Cannot read index from file '%s': %s\n", indexPath, err)
+		console.Fatal("Cannot find phrase in db:", err)
 	}
-	// find words from phrase
-	res := index.Find(phrase)
 	if len(res) == 0 {
 		console.Println("No entries")
 		return

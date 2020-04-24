@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/polisgo2020/search-K1ta/database"
 	"io"
 	"io/ioutil"
 	"sort"
@@ -76,6 +77,43 @@ func (index *Index) Save(writer io.Writer) error {
 	return nil
 }
 
+func (index *Index) SaveToDb(db *database.DB) error {
+	// add titles
+	indexMap := make(map[int]int64)
+	for i, title := range index.Titles {
+		id, err := db.AddTitle(title)
+		if err != nil {
+			return fmt.Errorf("error on adding title '%s' to database: %s", title, err)
+		}
+		if id == -1 {
+			return fmt.Errorf("failed to add title '%s'", title)
+		}
+		indexMap[i] = id
+	}
+
+	// add words
+	for word, indices := range index.Data {
+		wordId, err := db.AddWord(word)
+		if err != nil {
+			return fmt.Errorf("error on adding word '%s' to database: %s", word, err)
+		}
+		if wordId == -1 {
+			return fmt.Errorf("failed to add word '%s'", word)
+		}
+		// map indices to id's
+		mappedIndices := make([]int64, 0)
+		for index := range indices {
+			mappedIndices = append(mappedIndices, indexMap[index])
+		}
+		// add word indices
+		err = db.AddWordsIndices(wordId, mappedIndices)
+		if err != nil {
+			return fmt.Errorf("failed to add word '%s' with id '%d' indices: %s", word, wordId, err)
+		}
+	}
+	return nil
+}
+
 func Read(reader io.Reader) (Index, error) {
 	bytes, err := ioutil.ReadAll(reader)
 	if err != nil {
@@ -131,4 +169,25 @@ func (index *Index) Find(phrase string) map[string]int {
 		}
 	}
 	return entriesMap
+}
+
+func FindInDb(phrase string, db *database.DB) (map[string]int, error) {
+	entriesMap := make(map[string]int)
+	for _, word := range strings.Fields(phrase) {
+		word = unifyWord(word)
+		// get indexes of texts with this word
+		titleIndices, err := db.GetWordIndiced(word)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get word '%s' indices: %s", word, err)
+		}
+		// for each text titlesToIn add one entry
+		for _, titleId := range titleIndices {
+			title, err := db.GetTitleById(titleId)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get title by id %d: %s", titleId, err)
+			}
+			entriesMap[title]++
+		}
+	}
+	return entriesMap, nil
 }
