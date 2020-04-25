@@ -14,10 +14,6 @@ type App struct {
 	*database.DB
 }
 
-type config struct {
-	Addr string `env:"POLISGO_ADDR" envDefault:"localhost:8080"`
-}
-
 func (a *App) index(c echo.Context) error {
 	return c.Render(http.StatusOK, "index.html", nil)
 }

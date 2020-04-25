@@ -81,14 +81,14 @@ alter table word_title owner to postgres;
 func (db *DB) DropAll() (err error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("cannot begin transaction: %s", err)
+		return fmt.Errorf("cannot begin transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = fmt.Errorf("%s; cannot rollback: %s", err, rollbackErr)
+				err = fmt.Errorf("%s; cannot rollback: %w", err, rollbackErr)
 			}
-			err = fmt.Errorf("error on transaction: %s", err)
+			err = fmt.Errorf("error on transaction: %w", err)
 		}
 	}()
 	_, err = tx.Exec(dropAll)
@@ -113,19 +113,19 @@ func (db *DB) AddWord(word string) (int64, error) {
 func (db *DB) AddWordsIndices(wordId int64, indices []int64) (err error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("cannot begin transaction: %s", err)
+		return fmt.Errorf("cannot begin transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = fmt.Errorf("%s; cannot rollback: %s", err, rollbackErr)
+				err = fmt.Errorf("%s; cannot rollback: %w", err, rollbackErr)
 			}
-			err = fmt.Errorf("error on transaction: %s", err)
+			err = fmt.Errorf("error on transaction: %w", err)
 		}
 	}()
 	for _, titleId := range indices {
 		if _, err = tx.Exec("insert into word_title (word_id, title_id) values ($1, $2)", wordId, titleId); err != nil {
-			return fmt.Errorf("cannot insert: %s", err)
+			return fmt.Errorf("cannot insert: %w", err)
 		}
 	}
 	err = tx.Commit()
@@ -135,14 +135,14 @@ func (db *DB) AddWordsIndices(wordId int64, indices []int64) (err error) {
 func (db *DB) GetWordIndiced(word string) ([]int64, error) {
 	rows, err := db.Query(getIndices, word)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error on get indices: %w", err)
 	}
 	res := make([]int64, 0)
 	for rows.Next() {
 		var index int64
 		err = rows.Scan(&index)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error on scan: %w", err)
 		}
 		res = append(res, index)
 	}
@@ -154,30 +154,3 @@ func (db *DB) GetTitleById(id int64) (string, error) {
 	err := db.QueryRow(getTitle, id).Scan(&title)
 	return title, err
 }
-
-/*func (db DB) AddWord(word string, indices []int) (err error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("cannot begin transaction: %s", err)
-	}
-	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = fmt.Errorf("%s; cannot rollback: %s", err, rollbackErr)
-			}
-			err = fmt.Errorf("error on transaction: %s", err)
-		}
-	}()
-	for _, titleId := range indices {
-		if _, err = tx.Exec("INSERT INTO entry (word, title_id) VALUES (?, ?)", word, titleId); err != nil {
-			return fmt.Errorf("cannot insert: %s", err)
-		}
-	}
-	err = tx.Commit()
-	return
-}
-
-func (db DB) AddTitle(title string, index int) error {
-	res, err := db.Exec("insert into titles (name) values (?)", title)
-	res.LastInsertId()
-}*/

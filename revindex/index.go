@@ -72,7 +72,7 @@ func (index *Index) Save(writer io.Writer) error {
 		res = append(res, []byte(fmt.Sprintf("%s:%s\n", word, marshaledIndices))...)
 	}
 	if _, err := writer.Write(res); err != nil {
-		return fmt.Errorf("cannot write index: %s", err)
+		return fmt.Errorf("cannot write index: %w", err)
 	}
 	return nil
 }
@@ -83,7 +83,7 @@ func (index *Index) SaveToDb(db *database.DB) error {
 	for i, title := range index.Titles {
 		id, err := db.AddTitle(title)
 		if err != nil {
-			return fmt.Errorf("error on adding title '%s' to database: %s", title, err)
+			return fmt.Errorf("error on adding title '%s' to database: %w", title, err)
 		}
 		if id == -1 {
 			return fmt.Errorf("failed to add title '%s'", title)
@@ -95,7 +95,7 @@ func (index *Index) SaveToDb(db *database.DB) error {
 	for word, indices := range index.Data {
 		wordId, err := db.AddWord(word)
 		if err != nil {
-			return fmt.Errorf("error on adding word '%s' to database: %s", word, err)
+			return fmt.Errorf("error on adding word '%s' to database: %w", word, err)
 		}
 		if wordId == -1 {
 			return fmt.Errorf("failed to add word '%s'", word)
@@ -108,7 +108,7 @@ func (index *Index) SaveToDb(db *database.DB) error {
 		// add word indices
 		err = db.AddWordsIndices(wordId, mappedIndices)
 		if err != nil {
-			return fmt.Errorf("failed to add word '%s' with id '%d' indices: %s", word, wordId, err)
+			return fmt.Errorf("failed to add word '%s' with id '%d' indices: %w", word, wordId, err)
 		}
 	}
 	return nil
@@ -117,7 +117,7 @@ func (index *Index) SaveToDb(db *database.DB) error {
 func Read(reader io.Reader) (Index, error) {
 	bytes, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return Index{}, fmt.Errorf("cannot read index: %s", err)
+		return Index{}, fmt.Errorf("cannot read index: %w", err)
 	}
 	// split bytes into titles declarations and index
 	tokens := strings.Split(string(bytes), "-\n")
@@ -143,7 +143,7 @@ func Read(reader io.Reader) (Index, error) {
 		var titleIndices []int
 		err = json.Unmarshal([]byte(indices), &titleIndices)
 		if err != nil {
-			return Index{}, fmt.Errorf("cannot unmarshal list with indices: %s", err)
+			return Index{}, fmt.Errorf("cannot unmarshal list with indices: %w", err)
 		}
 		// put indices to set
 		set := Set{}
@@ -178,13 +178,13 @@ func FindInDb(phrase string, db *database.DB) (map[string]int, error) {
 		// get indexes of texts with this word
 		titleIndices, err := db.GetWordIndiced(word)
 		if err != nil {
-			return nil, fmt.Errorf("cannot get word '%s' indices: %s", word, err)
+			return nil, fmt.Errorf("cannot get word '%s' indices: %w", word, err)
 		}
 		// for each text titlesToIn add one entry
 		for _, titleId := range titleIndices {
 			title, err := db.GetTitleById(titleId)
 			if err != nil {
-				return nil, fmt.Errorf("cannot get title by id %d: %s", titleId, err)
+				return nil, fmt.Errorf("cannot get title by id %d: %w", titleId, err)
 			}
 			entriesMap[title]++
 		}

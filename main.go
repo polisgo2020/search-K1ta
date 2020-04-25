@@ -104,7 +104,7 @@ func main() {
 func getTextsAndTitlesFromDir(dirPath string) ([]string, []string, error) {
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error while reading dir '%s': %s", dirPath, err)
+		return nil, nil, fmt.Errorf("error while reading dir '%s': %w", dirPath, err)
 	}
 	texts := make([]string, 0, len(files))
 	titles := make([]string, 0, len(files))
