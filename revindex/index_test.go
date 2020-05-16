@@ -16,7 +16,7 @@ type Dictionary []string
 func getDictionary() (Dictionary, error) {
 	wordsBytes, err := ioutil.ReadFile("/usr/share/dict/words")
 	if err != nil {
-		return nil, fmt.Errorf("cannot read file /usr/share/dict/words: %s", err)
+		return nil, fmt.Errorf("cannot read file /usr/share/dict/words: %w", err)
 	}
 	return strings.Split(string(wordsBytes), "\n"), nil
 }

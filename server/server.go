@@ -1,9 +1,9 @@
 package server
 
 import (
-	"github.com/caarlos0/env/v6"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/polisgo2020/search-K1ta/database"
 	"github.com/polisgo2020/search-K1ta/revindex"
 	"github.com/polisgo2020/search-K1ta/server/templates"
 	"github.com/sirupsen/logrus"
@@ -11,11 +11,7 @@ import (
 )
 
 type App struct {
-	Index revindex.Index
-}
-
-type config struct {
-	Addr string `env:"POLISGO_ADDR" envDefault:"localhost:8080"`
+	*database.DB
 }
 
 func (a *App) index(c echo.Context) error {
@@ -23,24 +19,22 @@ func (a *App) index(c echo.Context) error {
 }
 
 func (a *App) search(c echo.Context) error {
-	res := a.Index.Find(c.QueryParam("phrase"))
 	logrus.Infoln(c.Request().RemoteAddr, "Phrase:", c.QueryParam("phrase"))
+	res, err := revindex.FindInDb(c.QueryParam("phrase"), a.DB)
+	if err != nil {
+		logrus.Error(c.Request().RemoteAddr, "Error:", err)
+		return c.Render(http.StatusInternalServerError, "index.html", res)
+	}
 	logrus.Infoln(c.Request().RemoteAddr, "Result:", res)
 	return c.Render(http.StatusOK, "index.html", res)
 }
 
-func Start(index revindex.Index) error {
+func Start(addr string, db *database.DB) error {
 	// configure logger
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
 		PadLevelText:  true,
 	})
-
-	// get config for server
-	var cfg config
-	if err := env.Parse(&cfg); err != nil {
-		logrus.Fatal("Error on parsing config:", err)
-	}
 
 	// create server
 	e := echo.New()
@@ -52,7 +46,7 @@ func Start(index revindex.Index) error {
 		}
 	})
 	e.Use(middleware.Recover())
-	app := App{index}
+	app := App{db}
 
 	// add page renderer
 	renderer, err := templates.Init()
@@ -67,7 +61,7 @@ func Start(index revindex.Index) error {
 	e.Static("/static", "server/static")
 
 	// start server
-	err = e.Start(cfg.Addr)
+	err = e.Start(addr)
 	if err != nil && err != http.ErrServerClosed {
 		return err
 	}
